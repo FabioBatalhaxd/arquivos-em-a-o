@@ -1,0 +1,3 @@
+import { createFileRoute } from '@tanstack/react-router';
+import { AccountManagement, accountsQuery } from '@/components/access/AccountManagement';
+export const Route=createFileRoute('/_authenticated/gestao')({head:()=>({meta:[{title:'Gestão de acessos — Black Friday 26'},{name:'description',content:'Cadastro de Masters e gestão dos donos de marcas no painel Black Friday 26.'},{property:'og:title',content:'Gestão de acessos — Black Friday 26'},{property:'og:description',content:'Gestão de acessos Master e de donos vinculados às suas marcas.'},{property:'og:type',content:'website'},{name:'twitter:card',content:'summary_large_image'}]}),loader:({context})=>context.queryClient.ensureQueryData(accountsQuery),component:AccountManagement});

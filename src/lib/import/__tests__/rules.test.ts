@@ -1,0 +1,26 @@
+import {describe,it,expect} from 'vitest';
+import {parseSpreadsheetRows} from '../records';
+import {filterImportedRecords} from '../../../services/importedDataService';
+import {ordersService} from '../../../services/ordersService';
+import {deliveryService} from '../../../services/deliveryService';
+import {leadTimeService} from '../../../services/leadTimeService';
+import {stratificationService} from '../../../services/stratificationService';
+const base={'Marca':'Animale','Origem':'Hub A','Hub corrigido':'CD Masculino','Status':'ENTREGUES','Existem ocorrencia':'Não','Data Venda':'01/10/2026','Data de Entrega':'03/10/2026','UF':'PE'};
+const records=parseSpreadsheetRows([base,{...base,Marca:'Farm Rio',Status:'AG. PROCESSAMENTO','Data de Entrega':'','Origem':'Hub B'},{...base,Status:'EXPEDIDOS','Data de Entrega':'','Existem ocorrencia':'Sim'}]);
+const filters={period:'Todo o período',operation:'Todos',brand:'Todas',carrier:'Todas',status:'Todos'};
+describe('Planilha operacional',()=>{
+ it('calcula dias da venda à entrega',()=>expect(leadTimeService.getSummary(filters,records).average/24).toBe(2));
+ it('separa processamento, expedidos e entregues',()=>{expect(ordersService.getMetrics(filters,records).sold).toBe(3);expect(ordersService.getMetrics(filters,records).shipped).toBe(2);expect(deliveryService.getSummary(filters,records).delivered).toBe(1);});
+ it('filtra Marca',()=>expect(filterImportedRecords(records,{...filters,brand:'Farm Rio'}).length).toBe(1));
+ it('filtra Origem',()=>expect(filterImportedRecords(records,{...filters,origin:'Hub A'}).length).toBe(2));
+ it('usa Origem mesmo quando Hub corrigido também existe',()=>expect(parseSpreadsheetRows([{...base,Origem:'CD Masculino','Hub corrigido':'Outro hub'}])[0]?.origin).toBe('CD Masculino'));
+ it('usa Hub corrigido para Operação ignorando outras colunas',()=>expect(parseSpreadsheetRows([{...base,Origem:'Loja A',Operação:'Outro valor',Operacao:'Outro valor'}])[0]?.operation).toBe('CD Masculino'));
+ it('filtra Operação usando Hub corrigido',()=>{const rows=parseSpreadsheetRows([base,{...base,'Hub corrigido':'CD Feminino'}]);expect(filterImportedRecords(rows,{...filters,operation:'CD Feminino'}).map(row=>row.operation)).toEqual(['CD Feminino']);});
+ it('exige Hub corrigido sem usar Origem ou Operação como substitutos',()=>{const {'Hub corrigido':hub,...withoutHub}=base;expect(()=>parseSpreadsheetRows([{...withoutHub,Operação:hub}])).toThrow('Colunas ausentes: Hub corrigido');});
+ it('não substitui Origem ausente por Hub corrigido',()=>{const {Origem,...withoutOrigin}=base;expect(()=>parseSpreadsheetRows([{...withoutOrigin,'Hub corrigido':Origem}])).toThrow('Colunas ausentes: Origem');});
+ it('filtra Existem ocorrencia independentemente da etapa',()=>expect(filterImportedRecords(records,{...filters,occurrence:'Com ocorrências'}).length).toBe(1));
+ it('inclui todas UFs e concilia totais',()=>{expect(stratificationService.getByUf(filters,records)[0]?.uf).toBe('PE');expect(stratificationService.getStages(filters,records).reduce((n,r)=>n+r.total,0)).toBe(3);});
+ it('rejeita entrega anterior à venda',()=>expect(()=>parseSpreadsheetRows([{...base,'Data de Entrega':'30/09/2026'}])).toThrow());
+ it('rejeita ausência das colunas obrigatórias',()=>expect(()=>parseSpreadsheetRows([{Marca:'Animale'}])).toThrow());
+ it('não usa mocks quando a planilha está vazia',()=>expect(ordersService.getMetrics(filters,[]).sold).toBe(0));
+});
