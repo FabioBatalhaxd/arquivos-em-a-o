@@ -1,0 +1,37 @@
+# Roadmap
+- [x] Criar modelo de dados e serviços desacoplados
+- [x] Construir dashboard operacional responsivo
+- [x] Implementar filtros globais e atualização automática
+- [x] Validar visual, interações e metadados
+
+- [x] Confirmar dashboard em / com lojas MEN/WOMAN, CDs MEN/WOMAN e gráficos fictícios
+- [x] Renomear operações para CD Masculino/Feminino e SFS Masculino/Feminino
+- [x] Incluir etapas de entrega, novas transportadoras e lead time
+- [x] Adicionar gráficos de entregas e validar desktop/mobile
+- [x] Compactar os gráficos operacionais em pares na página inicial
+- [x] Adicionar análise de anomalias por período com recomendações via AI Gateway
+- [x] Adicionar o título “Etapas entregas” acima dos indicadores de entrega
+- [x] Atualizar marcas, períodos, modelo de entregas e normalização de status
+- [x] Criar serviços de estratificação, origem e lead time
+- [x] Reorganizar a página inicial com os novos módulos operacionais
+- [x] Validar filtros, totalizadores, menu e responsividade
+- [x] Remover monitor Intelipost, status da operação, visão geral, origem e equilíbrio operacional
+- [x] Conectar todos os filtros à estratificação e alinhar seus totalizadores
+- [x] Exibir lead time em dias com visão comparável por UF e manter alertas operacionais
+- [x] Validar filtros e responsividade após a simplificação
+- [x] Simplificar progresso e lead time e unificar todos os filtros e totalizadores
+- [x] Validar consistência matemática e apresentação dos filtros
+
+- [x] Remover alertas operacionais e renomear/reposicionar backlog após pedidos vendidos
+- [x] Implementar acesso por nome da marca e senha, com Master e isolamento de dados
+- [x] Criar importação CSV/Excel com validação e substituição global segura
+- [x] Conectar dados importados, filtro de origem, ocorrências e lead time desde a venda
+- [x] Validar parser, filtros, cálculos e bloqueio sem login
+- [ ] Validar importação e isolamento ponta a ponta — depende da configuração do primeiro Master e de uma planilha real
+- [x] Separar mapeamento: Origem da coluna Origem e Operação da coluna Hub corrigido
+- [x] Permitir que um Master cadastre outros Masters e validar a autorização, cadastro e login do novo Master.
+- [x] Filtros com múltipla seleção (marca travada para perfil Marca)
+- [x] UF monocromática com alternador Todos os pedidos / Apenas entregas
+- [x] Período exibido em tela
+- [x] Rastreamento em 2 linhas e remoção de ocorrências (perfil Marca)
+- [x] Aba Monitoramento de Coletas com importação
