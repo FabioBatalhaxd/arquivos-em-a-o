@@ -33,17 +33,25 @@ export function mapStatus(raw: string): Pick<ImportedRecord,'status'|'stage'> {
   if (['em transito','transito','em transporte'].includes(s)) return {status:'Em trânsito',stage:'transit'};
   if (['em rota','saiu para entrega','em rota de entrega'].includes(s)) return {status:'Em rota',stage:'transit'};
   if (['entregue','entregues','entrega realizada'].includes(s)) return {status:'Entregue',stage:'delivered'};
-  if (['com ocorrencia','ocorrencia','extravio','devolucao','devolvido'].includes(s)) return {status:raw,stage:'incidents'};
+  if (['ag. tratativa','ag tratativa','com ocorrencia','ocorrencia','extravio','devolucao','devolvido'].includes(s)) return {status:raw,stage:'incidents'};
   throw new Error(`Status não reconhecido: ${raw}`);
 }
 
+const ALIASES: Record<string,string[]> = {
+  'Marca':['Marca'],'Origem':['Origem'],'Hub corrigido':['Hub corrigido'],
+  'Status':['Status','DE X PARA CORRIGIDO'],'Existem ocorrencia':['Existem ocorrencia','TEM OCORRÊNCIA?'],
+  'Data Venda':['Data Venda','DATA_HORA_INTEGRACAO'],'Data de Entrega':['Data de Entrega','DT_ENTREGA'],'UF':['UF','UF_DESTINO'],
+  'Transportadora':['Transportadora','TRANSP.'],
+};
 const REQUIRED = ['Marca','Origem','Hub corrigido','Status','Existem ocorrencia','Data Venda','Data de Entrega','UF'];
+const aliasesFor = (name: string) => ALIASES[name] ?? [name];
+const hasColumn = (keys: Map<string,string>, name: string) => aliasesFor(name).some(a => keys.has(normalize(a)));
 export const MAX_SOURCE_ROWS = 1048576;
 
 /** Streaming row parser + aggregator: identical dimensions collapse into one weighted record. */
 export function createImportAggregator(headers: string[]) {
   const keys = new Map(headers.map(key => [normalize(key), key]));
-  const missing = REQUIRED.filter(key => !keys.has(normalize(key)));
+  const missing = REQUIRED.filter(key => !hasColumn(keys, key));
   if (missing.length) throw new Error(`Colunas ausentes: ${missing.join(', ')}`);
   const groups = new Map<string, ImportedRecord & {quantity:number; sum:number; delivered:number}>();
   let rows = 0;
@@ -72,7 +80,7 @@ export function createImportAggregator(headers: string[]) {
 }
 
 function parseRow(row: Record<string,unknown>, keys: Map<string,string>, index: number): ImportedRecord {
-      const get = (...names: string[]) => { for (const name of names) { const key = keys.get(normalize(name)); if (key) return row[key]; } return undefined; };
+      const get = (...names: string[]) => { for (const name of names.flatMap(aliasesFor)) { const key = keys.get(normalize(name)); if (key) return row[key]; } return undefined; };
       const brand = String(get('Marca') ?? '').trim();
       const origin = String(get('Origem') ?? '').trim();
       if (!brand || !origin) throw new Error('Marca e Origem são obrigatórios');
@@ -86,7 +94,7 @@ function parseRow(row: Record<string,unknown>, keys: Map<string,string>, index: 
       if (!['','sim','s','1','true','yes','nao','n','0','false','no'].includes(flag)) throw new Error('Existem ocorrencia deve ser Sim/Não, 1/0 ou verdadeiro/falso');
       const operation = String(get('Hub corrigido') ?? '').trim();
       if (!operation) throw new Error('Hub corrigido é obrigatório para Operação');
-      return recordSchema.parse({ id: String(get('Pedido','Pedido_id','ID Pedido','Número do Pedido') ?? `linha-${index+2}`), brand,origin,operation,
+      return recordSchema.parse({ id: String(get('Pedido','Pedido_id','ID Pedido','Número do Pedido','PEDIDO_SITE') ?? `linha-${index+2}`), brand,origin,operation,
         carrier:String(get('Transportadora') ?? 'Não informada').trim() || 'Não informada',uf:String(get('UF') ?? '').trim().toUpperCase() || 'Não informada',
         ...status,incident:['sim','s','1','true','yes'].includes(flag) || status.stage==='incidents',soldAt,deliveredAt,hours });
 }
@@ -95,7 +103,7 @@ export function parseSpreadsheetRows(input: Record<string,unknown>[]): ImportedR
   if (!input.length) throw new Error('Planilha vazia.');
   if (input.length > 20000) throw new Error('Máximo de 20.000 linhas por importação.');
   const keys = new Map(Object.keys(input[0] ?? {}).map(key => [normalize(key), key]));
-  const missing = REQUIRED.filter(key => !keys.has(normalize(key)));
+  const missing = REQUIRED.filter(key => !hasColumn(keys, key));
   if (missing.length) throw new Error(`Colunas ausentes: ${missing.join(', ')}`);
   return input.map((row,index) => {
     try { return parseRow(row, keys, index); } catch(error) { throw new Error(`Linha ${index+2}: ${error instanceof Error ? error.message : 'Dados inválidos'}`); }
