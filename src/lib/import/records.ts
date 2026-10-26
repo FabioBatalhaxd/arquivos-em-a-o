@@ -34,7 +34,7 @@ export function mapStatus(raw: string): Pick<ImportedRecord,'status'|'stage'> {
   if (['em transito','transito','em transporte'].includes(s)) return {status:'Em trânsito',stage:'transit'};
   if (['em rota','saiu para entrega','em rota de entrega'].includes(s)) return {status:'Em rota',stage:'transit'};
   if (['entregue','entregues','entrega realizada'].includes(s)) return {status:'Entregue',stage:'delivered'};
-  if (['com ocorrencia','ocorrencia','extravio','devolucao','devolvido'].includes(s)) return {status:raw,stage:'incidents'};
+  if (['ag. tratativa','ag tratativa','com ocorrencia','ocorrencia','extravio','devolucao','devolvido'].includes(s)) return {status:raw,stage:'incidents'};
   throw new Error(`Status não reconhecido: ${raw}`);
 }
 
