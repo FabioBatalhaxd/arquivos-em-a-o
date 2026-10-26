@@ -1,5 +1,6 @@
 import type { DashboardFilters } from '@/types/dashboard';
 import type { ImportedRecord } from '@/lib/import/records';
+import { parseRange, inRange } from '@/lib/period';
 import { filterValues, matchesFilter } from '@/services/filterUtils';
 
 export function filterImportedRecords(records: ImportedRecord[], filters: DashboardFilters, now = new Date()) {
@@ -8,7 +9,7 @@ export function filterImportedRecords(records: ImportedRecord[], filters: Dashbo
   return records.filter(r => {
     const sale = new Date(r.soldAt);
     const limit = hourLimits[filters.period];
-    const period = filters.period === 'Hoje' ? localDay(sale) === localDay(now) : limit ? sale.getTime() <= now.getTime() && sale.getTime() >= now.getTime()-limit*3600000 : true;
+    const period = filters.period === 'Hoje' ? localDay(sale) === localDay(now) : parseRange(filters.period) ? inRange(filters.period, r.soldAt.slice(0, 10)) : limit ? sale.getTime() <= now.getTime() && sale.getTime() >= now.getTime()-limit*3600000 : true;
     const statuses = filterValues(filters.status);
     return period && matchesFilter(filters.brand, r.brand) && matchesFilter(filters.operation, r.operation) &&
       matchesFilter(filters.carrier, r.carrier) && matchesFilter(filters.origin, r.origin) &&

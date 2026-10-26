@@ -35,3 +35,5 @@
 - [x] Período exibido em tela
 - [x] Rastreamento em 2 linhas e remoção de ocorrências (perfil Marca)
 - [x] Aba Monitoramento de Coletas com importação
+- [x] Painel: sem card de ocorrência, nomes iguais, ordem por volume, UF por etapas no fim com botão Em trânsito
+- [x] Coletas: capitalização padronizada e AGUARDANDO = A confirmar
