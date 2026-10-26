@@ -7,7 +7,8 @@ export const collectionRecordSchema = z.object({
 });
 export type CollectionRecord = z.infer<typeof collectionRecordSchema>;
 
-const REQUIRED = ['Data do Pedido', 'Nome da Loja', 'Marca', 'SITUAÇÃO2'];
+const REQUIRED = ['Data do Pedido', 'Transportadora', 'UF Destino', 'Marca', 'Origem', 'Número do Pedido', 'Nome da Loja', 'Situação'];
+const SITUATION = ['Situação', 'SITUAÇÃO2', 'Situacao2'];
 
 function toDate(value: unknown): string {
   if (typeof value === 'number') return new Date(Date.UTC(1899, 11, 30) + value * 86400000).toISOString().slice(0, 10);
@@ -22,24 +23,24 @@ function toDate(value: unknown): string {
 /** "CONFIRMADO" → true, "A CONFIRMAR" → false; anything else is rejected. */
 export function collectionConfirmed(raw: unknown): boolean {
   const s = normalize(raw);
-  if (s === 'confirmado') return true;
-  if (s === 'a confirmar') return false;
+  if (['confirmado','cobrar movimentacao','ag. movimentacao','ag movimentacao','aguardando movimentacao'].includes(s)) return true;
+  if (['a confirmar','aguardando','ag. coleta','ag coleta','aguardando coleta','problema integracao','problema de integracao'].includes(s)) return false;
   throw new Error(`Situação não reconhecida: ${String(raw ?? '')}`);
 }
 
 /** Collapses identical rows into weighted records so the import stays small. */
 export function aggregateCollections(headers: string[], rows: Record<string, unknown>[]): CollectionRecord[] {
   const keys = new Map(headers.map(h => [normalize(h), h]));
-  const missing = REQUIRED.filter(k => !keys.has(normalize(k)));
+  const missing = REQUIRED.filter(k => !(k === 'Situação' ? SITUATION : [k]).some(n => keys.has(normalize(n))));
   if (missing.length) throw new Error(`Colunas ausentes: ${missing.join(', ')}`);
-  const get = (row: Record<string, unknown>, name: string) => { const k = keys.get(normalize(name)); return k ? row[k] : undefined; };
+  const get = (row: Record<string, unknown>, name: string) => { for (const n of name === 'Situação' ? SITUATION : [name]) { const k = keys.get(normalize(n)); if (k) return row[k]; } return undefined; };
   const groups = new Map<string, CollectionRecord>();
   rows.forEach((row, i) => {
     try {
       const brand = String(get(row, 'Marca') ?? '').trim(), store = String(get(row, 'Nome da Loja') ?? '').trim();
       if (!brand || !store) throw new Error('Marca e Nome da Loja são obrigatórios');
       const r = { brand, store, carrier: String(get(row, 'Transportadora') ?? '').trim(), origin: String(get(row, 'Origem') ?? '').trim(),
-        uf: String(get(row, 'UF Destino') ?? '').trim().toUpperCase(), date: toDate(get(row, 'Data do Pedido')), confirmed: collectionConfirmed(get(row, 'SITUAÇÃO2')) };
+        uf: String(get(row, 'UF Destino') ?? '').trim().toUpperCase(), date: toDate(get(row, 'Data do Pedido')), confirmed: collectionConfirmed(get(row, 'Situação')) };
       const key = [r.brand, r.store, r.carrier, r.origin, r.uf, r.date, r.confirmed].join('\u0001');
       const g = groups.get(key);
       if (g) g.quantity++; else groups.set(key, { ...r, quantity: 1 });
@@ -63,6 +64,7 @@ export function summarizeCollections(records: CollectionRecord[]): { brands: Col
     if (!s) { s = { name: r.store, pending: 0, confirmed: 0, total: 0 }; b.stores.set(r.store, s); }
     add(b.row, r); add(s, r); add(total, r);
   }
-  const list = [...brands.values()].map(({ row, stores }) => ({ ...row, stores: [...stores.values()].sort((a, b) => b.pending - a.pending) }));
-  return { brands: list.sort((a, b) => b.pending - a.pending), total };
+  const byVolume = (a: CollectionRow, b: CollectionRow) => b.total - a.total || b.confirmed - a.confirmed || a.name.localeCompare(b.name);
+  const list = [...brands.values()].map(({ row, stores }) => ({ ...row, stores: [...stores.values()].sort(byVolume) }));
+  return { brands: list.sort(byVolume), total };
 }

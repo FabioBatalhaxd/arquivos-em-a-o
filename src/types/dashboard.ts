@@ -103,11 +103,12 @@ export interface StageStratification {
 
 export interface UfStratification {
   uf: string;
-  volumes: Record<string, { total: number; delivered: number }>;
-  total: number;
+  processing: number;
+  awaitingCollection: number;
+  transit: number;
   delivered: number;
-  rates: Record<string, number | null>;
-  totalRate: number | null;
+  total: number;
+  deliveryRate: number | null;
 }
 
 export interface OriginPerformance {

@@ -9,7 +9,7 @@ import { accountCredentials, accountInput, accountBrandScope, requireMasterPermi
 import { DEFAULT_PERMISSIONS, accountBrands, resolvePermissions } from '@/lib/permissions';
 
 const credentials = accountCredentials;
-export const setupMaster = createServerFn({method:'POST'}).inputValidator((input: unknown) => credentials.extend({code:z.string().min(8).max(256)}).parse(input)).handler(async ({data}) => {
+export const setupMaster = createServerFn({method:'POST'}).inputValidator((input: unknown) => credentials.extend({code:z.string().min(16).max(256)}).parse(input)).handler(async ({data}) => {
   const code = process.env['MASTER_SETUP_CODE'];
   if (!code) throw new Error('Configuração inicial indisponível.');
   const {supabaseAdmin} = await import('@/integrations/supabase/client.server');

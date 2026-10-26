@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getCollections, importCollections } from '@/lib/collections.functions';
 import { aggregateCollections, summarizeCollections, type CollectionRow } from '@/lib/import/collections';
 import { cn } from '@/lib/utils';
+import { PeriodPicker } from '@/components/dashboard/PeriodPicker';
+import { ALL_PERIOD, formatDay, inRange } from '@/lib/period';
+import { displayText } from '@/lib/text-format';
 
 const fmt = new Intl.NumberFormat('pt-BR');
 const pct = (v: number, t: number) => t ? `${Math.round(v / t * 100)}%` : '—';
@@ -17,11 +20,11 @@ export function CollectionMonitor({ isMaster }: { isMaster: boolean }) {
   const fetchFn = useServerFn(getCollections), importFn = useServerFn(importCollections), qc = useQueryClient();
   const { data, isLoading, error: loadError } = useQuery({ queryKey: ['collections'], queryFn: () => fetchFn() });
   const [open, setOpen] = useState<Set<string>>(new Set());
-  const [f, setF] = useState({ date: ALL, carrier: ALL, uf: ALL });
+  const [f, setF] = useState({ date: ALL_PERIOD, carrier: ALL, uf: ALL });
   const [busy, setBusy] = useState(false), [msg, setMsg] = useState(''), [err, setErr] = useState('');
   const records = data?.records ?? [];
-  const opts = (k: 'date' | 'carrier' | 'uf') => [ALL, ...[...new Set(records.map(r => r[k]).filter(Boolean))].sort()];
-  const filtered = records.filter(r => (f.date === ALL || r.date === f.date) && (f.carrier === ALL || r.carrier === f.carrier) && (f.uf === ALL || r.uf === f.uf));
+  const opts = (k: 'carrier' | 'uf') => [ALL, ...[...new Set(records.map(r => r[k]).filter(Boolean))].sort()];
+  const filtered = records.filter(r => inRange(f.date, r.date) && (f.carrier === ALL || r.carrier === f.carrier) && (f.uf === ALL || r.uf === f.uf));
   const { brands, total } = useMemo(() => summarizeCollections(filtered), [filtered]);
 
   async function onFile(file: File) {
@@ -58,15 +61,17 @@ export function CollectionMonitor({ isMaster }: { isMaster: boolean }) {
   return <div id="coletas" className="scroll-mt-24 space-y-4">
     <section className="panel flex flex-wrap items-end justify-between gap-3 p-3">
       <div className="grid flex-1 gap-2 sm:grid-cols-3">
-        {([['date', 'DATA DO PEDIDO'], ['carrier', 'TRANSPORTADORA'], ['uf', 'UF DESTINO']] as const).map(([k, label]) =>
+        <PeriodPicker label="DATA DO PEDIDO" value={f.date} days={[...new Set(records.map(r => r.date))]} onChange={v => setF(s => ({ ...s, date: v }))} />
+        {([['carrier', 'TRANSPORTADORA'], ['uf', 'UF DESTINO']] as const).map(([k, label]) =>
           <label key={k} className="block min-w-0"><span className="mb-1.5 block text-[9px] font-bold text-muted-foreground">{label}</span>
             <Select value={f[k]} onValueChange={v => setF(s => ({ ...s, [k]: v }))}><SelectTrigger className="h-9 bg-card text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>{opts(k).map(o => <SelectItem key={o} value={o}>{k === 'date' && o !== ALL ? o.split('-').reverse().join('/') : o}</SelectItem>)}</SelectContent></Select></label>)}
+              <SelectContent>{opts(k).map(o => <SelectItem key={o} value={o}>{displayText(o)}</SelectItem>)}</SelectContent></Select></label>)}
       </div>
       {isMaster ? <label className="relative"><Button asChild disabled={busy}><span><Upload className="h-4 w-4" />{busy ? 'Importando…' : 'Importar planilha de coletas'}</span></Button>
         <input aria-label="Importar planilha de coletas" type="file" accept=".csv,.txt,.xlsx,.xls" disabled={busy} className="absolute inset-0 w-full cursor-pointer opacity-0" onChange={e => { const file = e.target.files?.[0]; if (file) void onFile(file); e.target.value = ''; }} /></label>
         : <p className="text-xs text-muted-foreground">A importação de coletas é feita pela conta Master.</p>}
     </section>
+    {records.length > 0 && (() => { const d = filtered.map(r => r.date).sort(); return <p className="inline-flex rounded-full border border-border bg-card px-3 py-1 text-[10px] font-bold text-muted-foreground">PERÍODO EXIBIDO: {d.length ? `${formatDay(d[0]!)} até ${formatDay(d[d.length - 1]!)}` : 'Sem coletas no período'}</p>; })()}
     {data?.latestImport && <p className="text-xs text-muted-foreground">{data.latestImport.filename} · {new Date(data.latestImport.created_at).toLocaleString('pt-BR')}</p>}
     {err && <p role="alert" className="text-sm text-destructive">{err}</p>}
     {msg && <p role="status" className="text-sm text-status-success">{msg}</p>}
@@ -80,19 +85,19 @@ export function CollectionMonitor({ isMaster }: { isMaster: boolean }) {
     <section className="panel overflow-hidden p-0">
       <div className="bg-institutional p-4 text-primary-foreground"><p className="text-[9px] font-bold">MONITORAMENTO DE COLETAS</p><h2 className="mt-1 text-base font-bold">Coletas por marca e loja</h2></div>
       <div className="overflow-x-auto"><Table className="min-w-[640px]">
-        <TableHeader>
-          <TableRow><TableHead rowSpan={2}>MARCAS / LOJAS</TableHead><TableHead rowSpan={2} className="text-right">TOTAL DE COLETAS</TableHead><TableHead colSpan={2} className="text-center">CONFIRMADO</TableHead><TableHead colSpan={2} className="text-center">A CONFIRMAR</TableHead></TableRow>
+        <TableHeader className="sticky top-0 z-10 bg-card [&_th]:text-[10px] [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide">
+          <TableRow><TableHead rowSpan={2}>Marcas / lojas</TableHead><TableHead rowSpan={2} className="text-right">Total de coletas</TableHead><TableHead colSpan={2} className="text-center">Confirmado</TableHead><TableHead colSpan={2} className="text-center">A confirmar</TableHead></TableRow>
           <TableRow><TableHead className="text-right">QTD</TableHead><TableHead className="text-right">%</TableHead><TableHead className="text-right">QTD</TableHead><TableHead className="text-right">%</TableHead></TableRow>
         </TableHeader>
         <TableBody>
           {brands.map(b => <Fragment key={b.name}>
-            <TableRow className="cursor-pointer font-semibold hover:bg-secondary/60" onClick={() => toggle(b.name)}>
-              <TableCell><span className="inline-flex items-center gap-1.5">{open.has(b.name) ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}{b.name}<span className="text-[10px] font-normal text-muted-foreground">({b.stores.length} lojas)</span></span></TableCell>
+            <TableRow className="cursor-pointer border-t border-border font-semibold transition-colors hover:bg-secondary/60 [&>td]:py-3" onClick={() => toggle(b.name)}>
+              <TableCell><span className="inline-flex items-center gap-1.5">{open.has(b.name) ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}{displayText(b.name)}<span className="text-[10px] font-normal text-muted-foreground">({b.stores.length} lojas)</span></span></TableCell>
               {cells(b, true)}
             </TableRow>
-            {open.has(b.name) && b.stores.map(s => <TableRow key={s.name} className="bg-secondary/30 text-xs"><TableCell className="pl-9">{s.name}</TableCell>{cells(s)}</TableRow>)}
+            {open.has(b.name) && b.stores.map(s => <TableRow key={s.name} className="bg-secondary/20 text-xs text-muted-foreground hover:bg-secondary/40"><TableCell className="relative pl-10 before:absolute before:inset-y-0 before:left-5 before:w-px before:bg-border">{displayText(s.name)}</TableCell>{cells(s)}</TableRow>)}
           </Fragment>)}
-          {brands.length > 0 && <TableRow className="bg-secondary font-extrabold"><TableCell>Total Geral</TableCell>{cells(total, true)}</TableRow>}
+          {brands.length > 0 && <TableRow className="border-t-2 border-foreground/20 bg-secondary font-extrabold [&>td]:py-3"><TableCell>Total geral</TableCell>{cells(total, true)}</TableRow>}
         </TableBody>
       </Table></div>
       {!brands.length && <p className="p-8 text-center text-sm text-muted-foreground">{isLoading ? 'Carregando coletas…' : loadError ? 'Não foi possível carregar as coletas.' : 'Nenhuma coleta importada ainda.'}</p>}
